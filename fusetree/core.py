@@ -10,6 +10,8 @@ import threading
 import traceback
 import urllib.request
 
+from . import util
+
 class Stat(NamedTuple):
     st_dev: int = None
     st_ino: int = None
@@ -604,31 +606,8 @@ class DictDir(Node):
             yield from self.items
 
 
-
-class LoggingFs(fuse.Operations):
-    log = logging.getLogger('fusetree')
-
-    def __init__(self, operations):
-        self.operations = operations
-
-    def __call__(self, op, path, *args):
-        self.log.debug('-> %s %s %s', op, path, repr(args))
-        ret = '[Unhandled Exception]'
-        try:
-            ret = self.operations.__call__(op, path, *args)
-            return ret
-        except OSError as e:
-            traceback.print_exc()
-            ret = str(e)
-            raise
-        finally:
-            self.log.debug('<- %s %s', op, '%d bytes' % len(ret) if isinstance(ret, bytes) else repr(ret))
-
-
-# create, mknod, mkdir, link, symlink, etc, are actually called on their parent folders
-
 class FuseTree(fuse.Operations):
-    def __init__(self, rootNode: Node_Like, mountpoint, **kwargs) -> None:
+    def __init__(self, rootNode: Node_Like, mountpoint, log=True, **kwargs) -> None:
         self.rootNode = FuseTree.to_node(rootNode)
         self._handle_lock = threading.Lock()
         self._next_handle = 1
@@ -636,7 +615,9 @@ class FuseTree(fuse.Operations):
         self._dir_handles: Dict[int, DirHandle] = {}
 
         kwargs.setdefault('fsname', self.rootNode.__class__.__name__)
-        fuse.FUSE(LoggingFs(self), mountpoint, raw_fi=True, **kwargs)
+
+        operations = self if not log else util.LoggingFuseOperations(self)
+        fuse.FUSE(operations, mountpoint, raw_fi=True, **kwargs)
 
 
     def decode_path(self, path: str) -> Path:

@@ -506,7 +506,6 @@ class GeneratorFile(Node):
         return GeneratorFile.Handle(self, self.generator, self.min_read_len)
 
     class Handle(FileHandle):
-        _eof = object()
         def __init__(self, node: Node, generator: Iterable[Bytes_Like], min_read_len: int = -1) -> None:
             super().__init__(node, direct_io = True)
             self.generator = iter(generator)
@@ -525,8 +524,10 @@ class GeneratorFile(Node):
                     ret += self.current_blob[self.current_blob_position : self.current_blob_position + n]
                     self.current_blob_position += n
                 else:
-                    next_blob = next(self.generator, GeneratorFile.Handle._eof)
-                    self.current_blob = None if next_blob is GeneratorFile.Handle._eof else FuseTree.to_bytes(next_blob)
+                    try:
+                        self.current_blob = FuseTree.to_bytes(next(self.generator))
+                    except StopIteration:
+                        self.current_blob = None
                     self.current_blob_position = 0
 
                 if self.min_read_len > 0 and len(ret) >= self.min_read_len:
@@ -573,7 +574,7 @@ class UrllibFile(Node):
         def read(self, path: Path, size: int, offset: int) -> bytes:
             return self.response.read(size)
 
-        def release(self, path: str) -> None:
+        def release(self, path: Path) -> None:
             self.response.close()
             print('close')
 

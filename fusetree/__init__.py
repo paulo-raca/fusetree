@@ -1,6 +1,6 @@
-from fusetree.core import Stat, StatVFS, Path, generatorfile
-from fusetree.core import Bytes_Like, Stat_Like, StatVFS_Like, Node_Like, FileHandle_Like, DirEntry, DirHandle_Like
-from fusetree.core import Path, Node, RootNode, DirHandle, FileHandle
+from fusetree.types import Stat, StatVFS, Path
+from fusetree.types import Bytes_Like, Stat_Like, StatVFS_Like, Node_Like, FileHandle_Like, DirEntry, DirHandle_Like
+from fusetree.core import Node, RootNode, DirHandle, FileHandle
+from fusetree.fusetree import FuseTree
 
-from fusetree.core import BlobFile, GeneratorFile, generatorfile, UrllibFile, DictDir
-from fusetree.core import FuseTree
+from fusetree.nodetypes import BlobFile, GeneratorFile, generatorfile, UrllibFile, DictDir

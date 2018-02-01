@@ -6,6 +6,20 @@ from .types import *
 from .core import *
 from . import types_conv
 
+class Symlink(Node):
+    def __init__(self, link: str, mode: int = 0o444) -> None:
+        self.link = link
+        self.mode = mode & 0o777
+
+    def getattr(self, path: Path) -> Stat:
+        return Stat(
+            st_mode=S_IFLNK | self.mode
+        )
+
+    def readlink(self, path: Path) -> str:
+        return self.link
+
+
 class BlobFile(Node):
     def __init__(self, data: bytes, mode: int = 0o444) -> None:
         self.data = data

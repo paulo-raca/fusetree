@@ -52,6 +52,7 @@ rootNode = {
     'count-forever': count(),
     '99-bottles': bottles(999),
     'xkcd': fusetree.UrllibFile('https://xkcd.com'),
+    'link': fusetree.Symlink('99-bottles'),
 }
 rootNode['z'] = rootNode
 

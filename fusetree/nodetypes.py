@@ -34,16 +34,10 @@ class BlobFile(Node):
     def open(self, path: Path, mode: int) -> FileHandle:
         return BlobFile.Handle(self, self.data)
 
-
     class Handle(FileHandle):
         def __init__(self, node: Node, data: bytes) -> None:
             super().__init__(node)
             self.data = data
-
-        def getattr(self, path: Path) -> Stat:
-            return Stat(
-                st_size=len(self.data),
-                **types_conv.as_stat(super().getattr(path))._asdict())
 
         def read(self, path: Path, size: int, offset: int) -> bytes:
             return self.data[offset : offset + size]
@@ -57,8 +51,7 @@ class GeneratorFile(Node):
 
     def getattr(self, path: Path) -> Stat:
         return Stat(
-            st_mode=S_IFREG | self.mode,
-            st_size=0
+            st_mode=S_IFREG | self.mode
         )
 
     def open(self, path: Path, mode: int) -> FileHandle:
@@ -115,8 +108,7 @@ class UrllibFile(Node):
 
     def getattr(self, path: Path) -> Stat:
         return Stat(
-            st_mode=S_IFREG | self.mode,
-            st_size=0
+            st_mode=S_IFREG | self.mode
         )
 
     def open(self, path: Path, mode: int) -> FileHandle:

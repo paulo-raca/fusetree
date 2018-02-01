@@ -12,9 +12,31 @@ from . import util
 from .types import *
 
 class Node:
-    def __getitem__(self, key: str) -> Node_Like:
-        return None
+    """
+    A node is the superclass of every entry in your filesystem.
 
+    When working with the FUSE api, you have only one callback for each function,
+    and must decide what to do based on the path.
+
+    In constrast, FuseTree will find the node represented by the path and
+    call the matching function on that object.
+
+    e.g., `getattr('/foo/bar')` becomes `root['foo']['bar'].getattr()`
+
+    Since node-creating operations, like `create`, `mkdir`, etc, receive paths that don't yet exist,
+    they are instead called on their parent directories instead.
+
+    e.g., `mkdir('/bar/foo/newdir')` becomes `root['bar']['foo'].mkdir('newdir')`
+
+    Common implementations to several common node types are provided on `nodetypes`.
+    """
+
+    def __getitem__(self, key: str) -> Node_Like:
+        """
+        get one of this directory's child nodes by name
+        (Or None if it doesn't exist)
+        """
+        return None
 
     def getattr(self, path: Path) -> Stat_Like:
         """
@@ -200,6 +222,10 @@ class Node:
 
 
 class RootNode(Node):
+    """
+    A RootNode is mostly just a normal node, but it can optionally handle the `init()` and `destroy()` calls.
+    """
+
     def init(self) -> None:
         """
         Initialize filesystem
@@ -224,6 +250,15 @@ class RootNode(Node):
 
 
 class DirHandle:
+    """
+    A DirHandle is what you get with a call to `opendir()`.
+
+    It can be used to list the directory contents (very important) and to fsync (optional)
+
+    You probably don't need to deal with this class directly: Just return a collection
+    of the file names on `opendir` and a new DirHandle will be created automatically
+    """
+
     def __init__(self, node: Node = None) -> None:
         self.node = node
 
@@ -251,6 +286,15 @@ class DirHandle:
 
 
 class FileHandle:
+    """
+    A FileHandle is what you get with a call to `open()` or `create()`.
+
+    Most importantly, you should implement `read` and/or `write`.
+
+    You probably don't need to deal with this class directly: Just return a blob from `read()`
+    and a FileHandle will be created automatically -- Otherwise, check the many common implementation in `nodetypes`
+    """
+
     def __init__(self, node: Node = None, direct_io: bool = False) -> None:
         self.node = node
         self.direct_io = direct_io

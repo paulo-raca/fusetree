@@ -222,7 +222,7 @@ class FuseTree(fuse.Operations):
 
     def rename(self, path: str, new_path: str) -> None:
         decoded_path = self.decode_path(path)
-        decoded_new_path, new_name = self.decode_folder(path)
+        decoded_new_path, new_name = self.decode_folder(new_path)
         decoded_path.target_node.rename(decoded_path, decoded_new_path, new_name)
 
     def rmdir(self, path: str) -> None:

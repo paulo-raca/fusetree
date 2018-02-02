@@ -48,23 +48,23 @@ class StatVFS(NamedTuple):
         }
 
 class Path:
-    def __init__(self, path: Sequence[Tuple[str, 'core.Node']]) -> None:
-        self.path = path
-        self.target_node = path[-1][1]
+    def __init__(self, elements: Sequence[Tuple[str, 'core.Node']]) -> None:
+        self.elements = elements
+        self.target_node = elements[-1][1]
 
     def __str__(self):
-        return '/'.join([name for name, node in self.path])
+        return '/'.join([name for name, node in self.elements])
 
     def __repr__(self):
         return 'Path([' + repr
 
 
 Bytes_Like = Union[bytes, str]
-Stat_Like = Union[Stat, dict]
+Stat_Like = Union[Stat, dict, int]
 StatVFS_Like = Union[StatVFS, dict]
 Node_Like = Union['core.Node', Bytes_Like, Dict[str, Any]]
 FileHandle_Like = Union['core.FileHandle', Bytes_Like, Iterable[Union[str, bytes]]]
 DirEntry = Union[str, Tuple[str, Stat_Like]]
-DirHandle_Like = Union['core.DirHandle', Iterable[str]]
+DirHandle_Like = Union['core.DirHandle', Iterable[str], Iterable[Tuple[str, int]]]
 
 from . import core

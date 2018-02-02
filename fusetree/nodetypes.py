@@ -6,9 +6,28 @@ from .types import *
 from .core import *
 from . import types_conv
 
-class Symlink(Node):
-    def __init__(self, link: str, mode: int = 0o444) -> None:
-        self.link = link
+class BaseFile(Node):
+    def __init__(self, mode: int = 0o444) -> None:
+        self.mode = mode & 0o777
+
+    def getattr(self, path: Path) -> Stat:
+        return Stat(
+            st_mode=S_IFREG | self.mode
+        )
+
+
+class BaseDir(Node):
+    def __init__(self, mode: int = 0o444) -> None:
+        self.mode = mode & 0o777
+
+    def getattr(self, path: Path) -> Stat:
+        return Stat(
+            st_mode=S_IFDIR | self.mode
+        )
+
+
+class BaseSymlink(Node):
+    def __init__(self, mode: int = 0o444) -> None:
         self.mode = mode & 0o777
 
     def getattr(self, path: Path) -> Stat:
@@ -16,14 +35,21 @@ class Symlink(Node):
             st_mode=S_IFLNK | self.mode
         )
 
+
+class Symlink(BaseSymlink):
+    def __init__(self, link: str, mode: int = 0o444) -> None:
+        super().__init__(mode)
+        self.link = link
+
     def readlink(self, path: Path) -> str:
         return self.link
 
 
-class BlobFile(Node):
+
+class BlobFile(BaseFile):
     def __init__(self, data: bytes, mode: int = 0o444) -> None:
+        super().__init__(mode)
         self.data = data
-        self.mode = mode & 0o777
 
     def getattr(self, path: Path) -> Stat:
         return Stat(
@@ -43,16 +69,11 @@ class BlobFile(Node):
             return self.data[offset : offset + size]
 
 
-class GeneratorFile(Node):
+class GeneratorFile(BaseFile):
     def __init__(self, generator: Iterable[Bytes_Like], mode: int = 0o444, min_read_len: int = -1) -> None:
+        super().__init__(mode)
         self.generator = generator
-        self.mode = mode & 0o777
         self.min_read_len = min_read_len
-
-    def getattr(self, path: Path) -> Stat:
-        return Stat(
-            st_mode=S_IFREG | self.mode
-        )
 
     def open(self, path: Path, mode: int) -> FileHandle:
         return GeneratorFile.Handle(self, self.generator, self.min_read_len)
@@ -101,15 +122,10 @@ def generatorfile(func):
     return tmp
 
 
-class UrllibFile(Node):
+class UrllibFile(BaseFile):
     def __init__(self, url: str, mode: int = 0o444) -> None:
+        super().__init__(mode)
         self.url = url
-        self.mode = mode & 0o777
-
-    def getattr(self, path: Path) -> Stat:
-        return Stat(
-            st_mode=S_IFREG | self.mode
-        )
 
     def open(self, path: Path, mode: int) -> FileHandle:
         return UrllibFile.Handle(self, self.url)
@@ -127,15 +143,10 @@ class UrllibFile(Node):
             self.response.close()
 
 
-class DictDir(Node):
+class DictDir(BaseDir):
     def __init__(self, contents: Dict[str, Node_Like], mode: int = 0o444) -> None:
+        super().__init__(mode)
         self.contents = contents
-        self.mode = mode & 0o777
-
-    def getattr(self, path: Path) -> Stat:
-        return Stat(
-            st_mode=S_IFDIR | self.mode
-        )
 
     def __getitem__(self, name: str) -> Node_Like:
         return self.contents.get(name, None)

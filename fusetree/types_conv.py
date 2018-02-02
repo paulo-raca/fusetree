@@ -46,6 +46,8 @@ def as_dirhandle(node: 'core.Node', dirhandle: DirHandle_Like) -> 'core.DirHandl
     raise fuse.FuseOSError(errno.EIO)
 
 def as_stat(stat: Stat_Like) -> Stat:
+    if isinstance(stat, int):
+        return Stat(st_mode=stat)
     if isinstance(stat, Stat):
         return stat
     elif isinstance(stat, dict):

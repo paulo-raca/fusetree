@@ -50,7 +50,18 @@ class StatVFS(NamedTuple):
 class Path:
     def __init__(self, elements: Sequence[Tuple[str, 'core.Node']]) -> None:
         self.elements = elements
-        self.target_node = elements[-1][1]
+
+    @property
+    def target_node(self):
+        return self.elements[-1][1]
+
+    @property
+    def parent_path(self):
+        return Path(self.elements[:-1])
+
+    @property
+    def parent_node(self):
+        return self.elements[:-2][1]
 
     def __str__(self):
         return '/'.join([name for name, node in self.elements])

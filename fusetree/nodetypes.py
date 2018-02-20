@@ -1,6 +1,6 @@
 from stat import S_IFDIR, S_IFLNK, S_IFREG
 from typing import Dict, Iterable
-import urllib.request
+import aiohttp
 from io import BytesIO
 
 import os
@@ -181,25 +181,28 @@ def generatorfile(func):
     return tmp
 
 
-class UrllibFile(BaseFile):
+class HttpFile(BaseFile):
     def __init__(self, url: str, mode: int = 0o444) -> None:
         super().__init__(mode)
         self.url = url
 
     async def open(self, mode: int) -> FileHandle:
-        return UrllibFile.Handle(self, self.url)
+        session = await aiohttp.ClientSession().__aenter__()
+        response = await (await session.get(self.url)).__aenter__()
+        return HttpFile.Handle(self, session, response)
 
     class Handle(FileHandle):
-        def __init__(self, node: Node, url: str) -> None:
-            super().__init__(node, direct_io = True)
-            self.url = url
-            self.response = urllib.request.urlopen(self.url)
+        def __init__(self, node: Node, session, response) -> None:
+            super().__init__(node, direct_io=True, nonseekable=True)
+            self.session = session
+            self.response = response
 
         async def read(self, size: int, offset: int) -> bytes:
-            return self.response.read(size)
+            return await self.response.content.read(size)
 
         async def release(self) -> None:
-            self.response.close()
+            await self.response.__aexit__(None, None, None)
+            await self.session.__aexit__(None, None, None)
 
 
 class DictDir(BaseDir):

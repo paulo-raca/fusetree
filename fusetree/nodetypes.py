@@ -99,7 +99,7 @@ class BlobFile(BaseFile):
 
         async def write(self, buffer, offset):
             if not self.node.rw:
-                raise fuse.FuseOSError(errno.ENOPERM)
+                raise fuse.FuseOSError(errno.EPERM)
 
             self.dirty = True
             self.buffer.seek(offset)
@@ -108,7 +108,7 @@ class BlobFile(BaseFile):
 
         async def truncate(self, size: int) -> None:
             if not self.node.rw:
-                raise fuse.FuseOSError(errno.ENOPERM)
+                raise fuse.FuseOSError(errno.EPERM)
 
             self.dirty = True
             self.buffer.truncate(size)
@@ -229,7 +229,7 @@ class DictDir(BaseDir):
 
     async def mknod(self, name: str, mode: int, dev: int) -> Node_Like:
         if not self.rw:
-            raise fuse.FuseOSError(errno.ENOPERM)
+            raise fuse.FuseOSError(errno.EPERM)
 
         if dev != 0:
             raise fuse.FuseOSError(errno.ENOSYS)
@@ -240,7 +240,7 @@ class DictDir(BaseDir):
 
     async def mkdir(self, name: str, mode: int) -> Node_Like:
         if not self.rw:
-            raise fuse.FuseOSError(errno.ENOPERM)
+            raise fuse.FuseOSError(errno.EPERM)
 
         new_dir = DictDir({}, mode, rw=True)
         self.contents[name] = new_dir
@@ -248,19 +248,19 @@ class DictDir(BaseDir):
 
     async def unlink(self, name: str) -> None:
         if not self.rw:
-            raise fuse.FuseOSError(errno.ENOPERM)
+            raise fuse.FuseOSError(errno.EPERM)
 
         del self.contents[name]
 
     async def rmdir(self, name: str) -> None:
         if not self.rw:
-            raise fuse.FuseOSError(errno.ENOPERM)
+            raise fuse.FuseOSError(errno.EPERM)
 
         del self.contents[name]
 
     async def symlink(self, name: str, target: str) -> Node_Like:
         if not self.rw:
-            raise fuse.FuseOSError(errno.ENOPERM)
+            raise fuse.FuseOSError(errno.EPERM)
 
         new_link = Symlink(target)
         self.contents[name] = new_link
@@ -270,7 +270,7 @@ class DictDir(BaseDir):
             raise fuse.FuseOSError(errno.ENOSYS)
 
         if not self.rw or not new_parent.rw:
-            raise fuse.FuseOSError(errno.ENOPERM)
+            raise fuse.FuseOSError(errno.EPERM)
 
         node = self.contents[name]
         del self.contents[name]

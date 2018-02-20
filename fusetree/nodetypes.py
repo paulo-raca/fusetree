@@ -177,7 +177,7 @@ def generatorfile(func):
                 return self.func(*self.args, **self.kwargs)
 
         iterable = Iterable(func, *args, **kwargs)
-        return GeneratorFile(iterable, min_read_len=1)
+        return GeneratorFile(iterable)
     return tmp
 
 

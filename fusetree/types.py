@@ -20,6 +20,11 @@ class Stat(NamedTuple):
     st_ctime: float = None
     st_birthtime: float = None
 
+    def with_values(self, **kwargs):
+        values = self.as_dict()
+        values.update(kwargs)
+        return Stat(**values)
+
     def as_dict(self) -> dict:
         return {
             k: v
@@ -75,7 +80,7 @@ Stat_Like = Union[Stat, dict, int]
 StatVFS_Like = Union[StatVFS, dict]
 Node_Like = Union['core.Node', Bytes_Like, Dict[str, Any]]
 FileHandle_Like = Union['core.FileHandle', Bytes_Like, Iterable[Union[str, bytes]]]
-DirEntry = Union[str, Tuple[str, Stat_Like]]
+DirEntry = Union[str, Tuple[str, Node_Like]]
 DirHandle_Like = Union['core.DirHandle', Iterable[str], Iterable[Tuple[str, int]]]
 
 from . import core

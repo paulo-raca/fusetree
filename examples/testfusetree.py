@@ -1,3 +1,7 @@
+import sys
+sys.path.append("/media/Paulo/Workspace/spotify/fusetree")
+
+
 import fusetree
 import logging
 from stat import S_IFDIR, S_IFLNK, S_IFREG
@@ -21,7 +25,6 @@ import fuse
 
 
 
-
 @fusetree.generatorfile
 def count(n=None):
     i = 1
@@ -32,18 +35,22 @@ def count(n=None):
 @fusetree.generatorfile
 def bottles(n):
    for i in range(n, 0, -1):
-      yield """\
-            {0} {2} of beer on the wall
-            {0} {2} of beer
-            Take one down, pass it around
-            {1} {3} of beer on the wall
-            """.format(
+      yield \
+"""\
+{0} {2} of beer on the wall
+{0} {2} of beer
+Take one down, pass it around
+{1} {3} of beer on the wall
+
+""".format(
                 i, i - 1,
                 "bottle" if i == 1 else "bottles",
                 "bottle" if i - 1 == 1 else "bottles"
             )
 
 rootNode = {
+    'editable': fusetree.BlobFile(b"xyz", rw=True),
+    'editabledir': fusetree.DictDir({}, rw=True),
     'Foo': b'meh',
     'Bar':'sldkjfn',
     'w': [1,2,3,4],

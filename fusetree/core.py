@@ -1,6 +1,6 @@
 import fuse
 from fuse import fuse_file_info
-from typing import Dict, Iterator, Iterable, Sequence, Tuple, Optional, Any, NamedTuple, Union
+from typing import Dict, Iterator, Iterable, Sequence, Tuple, Optional, Any, NamedTuple, Union, List
 
 import logging
 import errno
@@ -31,14 +31,43 @@ class Node:
     Common implementations to several common node types are provided on `nodetypes`.
     """
 
-    def __getitem__(self, key: str) -> Node_Like:
+    def __init__(self, attr_timeout=1, entry_timeout=1):
+        self.attr_timeout = attr_timeout
+        self.entry_timeout = entry_timeout
+
+    @property
+    def attr_timeout(self):
+        return 1
+
+    @property
+    def entry_timeout(self):
+        return 1
+
+    async def remember(self) -> None:
+        """
+        Hint that this node has been added to the kernel cache.
+        On the root node it will be called once, when the FS is mounted -- Therefore it acts as fuse_init()
+        """
+        print(f'Remeber {self}')
+        pass
+
+    async def forget(self) -> None:
+        """
+        Hint that this node has been removed from the kernel cache
+
+        On the root node it will be called once, when the FS is unmounted -- Therefore it acts as fuse_destroy()
+        """
+        print(f'Forget {self}')
+        pass
+
+    async def lookup(self, name: str) -> Node_Like:
         """
         get one of this directory's child nodes by name
         (Or None if it doesn't exist)
         """
         return None
 
-    def getattr(self, path: Path) -> Stat_Like:
+    async def getattr(self) -> Stat_Like:
         """
         Get file attributes.
 
@@ -50,13 +79,31 @@ class Node:
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def readlink(self, path: Path) -> str:
+    async def setattr(self, new_attr: Stat, to_set: List[str]) -> Stat_Like:
+        cur_attr = await self.getattr()
+
+        if 'st_mode' in to_set:
+            await self.chmod(new_attr.st_mode)
+        if 'st_uid' in to_set or 'st_gid' in to_set:
+            await self.chown(
+                new_attr.st_uid if 'st_uid' in to_set else cur_attr.st_uid,
+                new_attr.st_gid if 'st_gid' in to_set else cur_attr.st_gid)
+        if 'st_size' in to_set:
+            await self.truncate(new_attr.st_size)
+        if 'st_atime' in to_set or 'st_mtime' in to_set or 'st_ctime' in to_set:
+            await self.utimens(
+                new_attr.st_atime if 'st_atime' in to_set else cur_attr.st_atime,
+                new_attr.st_mtime if 'st_mtime' in to_set else cur_attr.st_mtime)
+
+        return await self.getattr()
+
+    async def readlink(self) -> str:
         """
         Read the target of a symbolic link
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def mknod(self, path: Path, name: str, mode: int, dev: int) -> None:
+    async def mknod(self, name: str, mode: int, dev: int) -> Node_Like:
         """
         Create a file node
 
@@ -66,7 +113,7 @@ class Node:
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def mkdir(self, path: Path, name: str, mode: int) -> None:
+    async def mkdir(self, name: str, mode: int) -> Node_Like:
         """
         Create a directory
 
@@ -76,27 +123,25 @@ class Node:
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def unlink(self, path: Path) -> None:
+    async def unlink(self, name: str) -> None:
         """
         Remove a file
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def rmdir(self, path: Path) -> None:
+    async def rmdir(self, name: str) -> None:
         """
         Remove a directory
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def symlink(self, path: Path, name: str, target: str) -> None:
+    async def symlink(self, name: str, target: str) -> Node_Like:
         """
         Create a symbolic link
-
-        TODO: `target` should probably be a `Path`?
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def rename(self, path: Path, new_path: Path, new_name: str) -> None:
+    async def rename(self, old_name: str, new_parent: 'Node', new_name: str) -> None:
         """
         Rename a file
 
@@ -104,31 +149,41 @@ class Node:
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def link(self, path: Path, name: str, target: Path) -> None:
+    async def link(self, name: str, node: 'Node') -> Node_Like:
         """
         Create a hard link to a file
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def chmod(self, path: Path, amode: int) -> None:
+
+    # FIXME: Not implemented below here until opendir
+    async def chmod(self, amode: int) -> None:
         """
         Change the permission bits of a file
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def chown(self, path: Path, uid: int, gid: int) -> None:
+    async def chown(self, uid: int, gid: int) -> None:
         """
         Change the owner and group of a file.
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def truncate(self, path: Path, length: int) -> None:
+    async def truncate(self, length: int) -> None:
         """
         Change the size of a file
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def open(self, path: Path, mode: int) -> 'FileHandle':
+    async def utimens(self, atime: float, mtime: float) -> None:
+        """
+        Change the access and modification times of a file with
+        nanosecond resolution
+        """
+        raise fuse.FuseOSError(errno.ENOSYS)
+
+
+    async def open(self, mode: int) -> 'FileHandle':
         """
         File open operation
 
@@ -147,31 +202,31 @@ class Node:
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def setxattr(self, path: Path, name: str, value: bytes, flags: int) -> None:
+    async def setxattr(self, name: str, value: bytes, flags: int) -> None:
         """
         Set extended attributes
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def getxattr(self, path: Path, name: str) -> bytes:
+    async def getxattr(self, name: str) -> bytes:
         """
         Get extended attributes
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def listxattr(self, path: Path) -> Iterable[str]:
+    async def listxattr(self) -> Iterable[str]:
         """
         List extended attributes
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def removexattr(self, path: Path, name: str) -> None:
+    async def removexattr(self, name: str) -> None:
         """
         Remove extended attributes
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def opendir(self, path: Path) -> DirHandle_Like:
+    async def opendir(self) -> DirHandle_Like:
 
         """
         Open directory
@@ -184,7 +239,7 @@ class Node:
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def access(self, path: Path, amode: int) -> int:
+    async def access(self, amode: int) -> int:
         """
         Check file access permissions
 
@@ -194,7 +249,7 @@ class Node:
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def create(self, path: Path, name: str, mode: int) -> 'FileHandle':
+    async def create(self, name: str, mode: int) -> 'FileHandle':
         """
         Check file access permissions
 
@@ -204,14 +259,7 @@ class Node:
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def utimens(self, path: Path, atime: float, mtime: float) -> None:
-        """
-        Change the access and modification times of a file with
-        nanosecond resolution
-        """
-        raise fuse.FuseOSError(errno.ENOSYS)
-
-    def bmap(self, path: Path, blocksize: int, idx: int) -> int:
+    async def bmap(self, blocksize: int, idx: int) -> int:
         """
         Map block index within file to block index within device
 
@@ -240,7 +288,7 @@ class RootNode(Node):
         """
         pass
 
-    def statfs(self) -> StatVFS:
+    async def statfs(self) -> StatVFS:
         """
         Get file system statistics
 
@@ -262,13 +310,13 @@ class DirHandle:
     def __init__(self, node: Node = None) -> None:
         self.node = node
 
-    def readdir(self, path: Path) -> Iterable[DirEntry]:
+    async def readdir(self) -> Iterable[DirEntry]:
         """
         Read directory
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def fsyncdir(self, path: Path, datasync: int) -> None:
+    async def fsyncdir(self, datasync: int) -> None:
         """
         Synchronize directory contents
 
@@ -277,7 +325,7 @@ class DirHandle:
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def releasedir(self, path: Path) -> None:
+    async def releasedir(self) -> None:
         """
         Release directory
         """
@@ -295,11 +343,12 @@ class FileHandle:
     and a FileHandle will be created automatically -- Otherwise, check the many common implementation in `nodetypes`
     """
 
-    def __init__(self, node: Node = None, direct_io: bool = False) -> None:
+    def __init__(self, node: Node = None, direct_io: bool = False, nonseekable: bool = False) -> None:
         self.node = node
         self.direct_io = direct_io
+        self.nonseekable = nonseekable
 
-    def getattr(self, path: Path) -> Stat_Like:
+    async def getattr(self) -> Stat_Like:
         """
         Get file attributes of an open file.
 
@@ -311,29 +360,56 @@ class FileHandle:
         """
         return self.node.getattr(path)
 
-    def chmod(self, path: Path, amode: int) -> None:
+    async def setattr(self, new_attr: Stat, to_set: List[str]) -> Stat_Like:
+        cur_attr = await self.getattr()
+
+        if 'st_mode' in to_set:
+            await self.chmod(new_attr.st_mode)
+        if 'st_uid' in to_set or 'st_gid' in to_set:
+            await self.chown(
+                new_attr.st_uid if 'st_uid' in to_set else cur_attr.st_uid,
+                new_attr.st_gid if 'st_gid' in to_set else cur_attr.st_gid)
+        if 'st_size' in to_set:
+            await self.truncate(new_attr.st_size)
+        if 'st_atime' in to_set or 'st_mtime' in to_set or 'st_ctime' in to_set:
+            await self.utimens(
+                new_attr.st_atime if 'st_atime' in to_set else cur_attr.st_atime,
+                new_attr.st_mtime if 'st_mtime' in to_set else cur_attr.st_mtime)
+
+        return await self.getattr()
+
+    async def chmod(self, amode: int) -> None:
         """
         Change the permission bits of an open file.
 
         FIXME: This doesn't seem to be supported by fusepy
         """
-        return self.node.chmod(path, amode)
+        raise fuse.FuseOSError(errno.ENOSYS)
 
-    def chown(self, path: Path, uid: int, gid: int) -> None:
+    async def chown(self, uid: int, gid: int) -> None:
         """
         Change the owner and group of an open file.
 
         FIXME: This doesn't seem to be supported by fusepy
         """
-        return self.node.chown(path, uid, gid)
+        raise fuse.FuseOSError(errno.ENOSYS)
 
-    def truncate(self, path: Path, length: int) -> None:
+    async def truncate(self, length: int) -> None:
         """
         Change the size of a file
         """
-        return self.node.truncate(path, length)
+        raise fuse.FuseOSError(errno.ENOSYS)
 
-    def read(self, path: Path, size: int, offset: int) -> bytes:
+    async def utimens(self, atime: float, mtime: float) -> None:
+        """
+        Change the access and modification times of a file with
+        nanosecond resolution
+        """
+        return self.node.utimens(path, atime, mtime)
+
+
+
+    async def read(self, size: int, offset: int) -> bytes:
         """
         Read data from an open file
 
@@ -346,7 +422,7 @@ class FileHandle:
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def write(self, path: Path, data: bytes, offset: int) -> int:
+    async def write(self, data: bytes, offset: int) -> int:
         """
         Write data to an open file
 
@@ -356,7 +432,7 @@ class FileHandle:
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def flush(self, path: Path) -> None:
+    async def flush(self) -> None:
         """
         Possibly flush cached data
 
@@ -381,7 +457,7 @@ class FileHandle:
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def release(self, path: Path) -> None:
+    async def release(self) -> None:
         """
         Release an open file
 
@@ -397,7 +473,7 @@ class FileHandle:
         """
         pass
 
-    def fsync(self, path: Path, datasync: int) -> None:
+    async def fsync(self, datasync: int) -> None:
         """
         Release an open file
 
@@ -413,7 +489,7 @@ class FileHandle:
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def lock(self, path: Path, cmd: int, lock: Any) -> None:
+    async def lock(self, cmd: int, lock: Any) -> None:
         """
         Perform POSIX file locking operation
 
@@ -448,9 +524,3 @@ class FileHandle:
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    def utimens(self, path: Path, atime: float, mtime: float) -> None:
-        """
-        Change the access and modification times of a file with
-        nanosecond resolution
-        """
-        return self.node.utimens(path, atime, mtime)

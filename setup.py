@@ -11,6 +11,7 @@ setup(
     download_url = 'https://github.com/paulo-raca/fusetree',
     keywords = ['fuse'],
     install_requires = [
-        "fusepy"
+        "fusepy",
+        "aiohttp"
     ]
 )

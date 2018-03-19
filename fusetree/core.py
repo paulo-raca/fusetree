@@ -48,7 +48,6 @@ class Node:
         Hint that this node has been added to the kernel cache.
         On the root node it will be called once, when the FS is mounted -- Therefore it acts as fuse_init()
         """
-        print(f'Remeber {self}')
         pass
 
     async def forget(self) -> None:
@@ -57,7 +56,6 @@ class Node:
 
         On the root node it will be called once, when the FS is unmounted -- Therefore it acts as fuse_destroy()
         """
-        print(f'Forget {self}')
         pass
 
     async def lookup(self, name: str) -> Node_Like:
@@ -96,6 +94,31 @@ class Node:
                 new_attr.st_mtime if 'st_mtime' in to_set else cur_attr.st_mtime)
 
         return await self.getattr()
+
+    async def chmod(self, amode: int) -> None:
+        """
+        Change the permission bits of a file
+        """
+        raise fuse.FuseOSError(errno.ENOSYS)
+
+    async def chown(self, uid: int, gid: int) -> None:
+        """
+        Change the owner and group of a file.
+        """
+        raise fuse.FuseOSError(errno.ENOSYS)
+
+    async def truncate(self, length: int) -> None:
+        """
+        Change the size of a file
+        """
+        raise fuse.FuseOSError(errno.ENOSYS)
+
+    async def utimens(self, atime: float, mtime: float) -> None:
+        """
+        Change the access and modification times of a file with
+        nanosecond resolution
+        """
+        raise fuse.FuseOSError(errno.ENOSYS)
 
     async def readlink(self) -> str:
         """
@@ -144,8 +167,6 @@ class Node:
     async def rename(self, old_name: str, new_parent: 'Node', new_name: str) -> None:
         """
         Rename a file
-
-        FIXME: fuse.h defines an extra `flags` argument
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
@@ -154,34 +175,6 @@ class Node:
         Create a hard link to a file
         """
         raise fuse.FuseOSError(errno.ENOSYS)
-
-
-    # FIXME: Not implemented below here until opendir
-    async def chmod(self, amode: int) -> None:
-        """
-        Change the permission bits of a file
-        """
-        raise fuse.FuseOSError(errno.ENOSYS)
-
-    async def chown(self, uid: int, gid: int) -> None:
-        """
-        Change the owner and group of a file.
-        """
-        raise fuse.FuseOSError(errno.ENOSYS)
-
-    async def truncate(self, length: int) -> None:
-        """
-        Change the size of a file
-        """
-        raise fuse.FuseOSError(errno.ENOSYS)
-
-    async def utimens(self, atime: float, mtime: float) -> None:
-        """
-        Change the access and modification times of a file with
-        nanosecond resolution
-        """
-        raise fuse.FuseOSError(errno.ENOSYS)
-
 
     async def open(self, mode: int) -> 'FileHandle':
         """
@@ -227,7 +220,6 @@ class Node:
         raise fuse.FuseOSError(errno.ENOSYS)
 
     async def opendir(self) -> DirHandle_Like:
-
         """
         Open directory
 
@@ -239,7 +231,16 @@ class Node:
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    async def access(self, amode: int) -> int:
+    async def statfs(self) -> StatVFS:
+        """
+        Get file system statistics
+
+        The 'f_favail', 'f_fsid' and 'f_flag' fields are ignored
+        """
+        raise fuse.FuseOSError(errno.ENOSYS)
+
+
+    async def access(self, amode: int) -> None:
         """
         Check file access permissions
 
@@ -247,7 +248,7 @@ class Node:
         'default_permissions' mount option is given, this method is not
         called.
         """
-        raise fuse.FuseOSError(errno.ENOSYS)
+        pass
 
     async def create(self, name: str, mode: int) -> 'FileHandle':
         """
@@ -259,42 +260,6 @@ class Node:
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
-    async def bmap(self, blocksize: int, idx: int) -> int:
-        """
-        Map block index within file to block index within device
-
-        Note: This makes sense only for block device backed filesystems
-        mounted with the 'blkdev' option
-        """
-        raise fuse.FuseOSError(errno.ENOSYS)
-
-
-class RootNode(Node):
-    """
-    A RootNode is mostly just a normal node, but it can optionally handle the `init()` and `destroy()` calls.
-    """
-
-    def init(self) -> None:
-        """
-        Initialize filesystem
-        """
-        pass
-
-    def destroy(self) -> None:
-        """
-        Clean up filesystem
-
-        Called on filesystem exit.
-        """
-        pass
-
-    async def statfs(self) -> StatVFS:
-        """
-        Get file system statistics
-
-        The 'f_favail', 'f_fsid' and 'f_flag' fields are ignored
-        """
-        raise fuse.FuseOSError(errno.ENOSYS)
 
 
 class DirHandle:
@@ -358,7 +323,7 @@ class FileHandle:
         but libfuse and the kernel will still assign a different
         inode for internal use (called the "nodeid").
         """
-        return self.node.getattr(path)
+        raise fuse.FuseOSError(errno.ENOSYS)
 
     async def setattr(self, new_attr: Stat, to_set: List[str]) -> Stat_Like:
         cur_attr = await self.getattr()
@@ -381,22 +346,18 @@ class FileHandle:
     async def chmod(self, amode: int) -> None:
         """
         Change the permission bits of an open file.
-
-        FIXME: This doesn't seem to be supported by fusepy
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
     async def chown(self, uid: int, gid: int) -> None:
         """
         Change the owner and group of an open file.
-
-        FIXME: This doesn't seem to be supported by fusepy
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
     async def truncate(self, length: int) -> None:
         """
-        Change the size of a file
+        Change the size of an open file.
         """
         raise fuse.FuseOSError(errno.ENOSYS)
 
@@ -405,9 +366,7 @@ class FileHandle:
         Change the access and modification times of a file with
         nanosecond resolution
         """
-        return self.node.utimens(path, atime, mtime)
-
-
+        raise fuse.FuseOSError(errno.ENOSYS)
 
     async def read(self, size: int, offset: int) -> bytes:
         """
@@ -415,7 +374,7 @@ class FileHandle:
 
         Read should return exactly the number of bytes requested except
         on EOF or error, otherwise the rest of the data will be
-        substituted with zeroes.	 An exception to this is when the
+        substituted with zeroes. An exception to this is when the
         'direct_io' mount option is specified, in which case the return
         value of the read system call will reflect the return value of
         this operation.
@@ -455,7 +414,7 @@ class FileHandle:
         Filesystems shouldn't assume that flush will always be called
         after some writes, or that if will be called at all.
         """
-        raise fuse.FuseOSError(errno.ENOSYS)
+        pass
 
     async def release(self) -> None:
         """
@@ -487,7 +446,7 @@ class FileHandle:
         release will mean, that no more reads/writes will happen on the
         file.  The return value of release is ignored.
         """
-        raise fuse.FuseOSError(errno.ENOSYS)
+        pass
 
     async def lock(self, cmd: int, lock: Any) -> None:
         """

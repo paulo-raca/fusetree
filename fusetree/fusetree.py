@@ -17,10 +17,23 @@ from .types import *
 from .core import *
 from .types_conv import *
 
-_task_locals = {}
-async def get_locals():
-    loop = asyncio.get_event_loop()
 
+def pretty(x):
+    if isinstance(x, ctypes.Structure):
+        return f'{x.__class__.__name__}(%s)' % (', '.join([
+          f'{entry[0]}={pretty(getattr(x, entry[0]))}'
+          for entry in x._fields_
+          if getattr(x, entry[0])
+        ]))
+    elif isinstance(x, list):
+        return '[' + ', '.join([pretty(item) for item in x]) + ']'
+    else:
+        return str(x)
+
+def copy_struct(struct):
+    copy = type(struct)()
+    ctypes.pointer(copy)[0] = struct
+    return copy
 
 
 class FuseTree(fusell.FUSELL):
@@ -108,7 +121,7 @@ class FuseTree(fusell.FUSELL):
         return attr
 
     async def _reply_readlink(self, req, link: str) -> str:
-        self.reply_readlink(req, link.encode(self.encoding))
+        self.reply_readlink(req, link)
         return link
 
     async def _reply_none(self, req, ret=None):
@@ -131,31 +144,19 @@ class FuseTree(fusell.FUSELL):
 
                 contents = arg.contents
                 if isinstance(contents, ctypes.Structure):
-                    copy = type(contents)()
-                    ctypes.pointer(copy)[0] = contents
-                    return copy
+                    return copy_struct(contents)
                 else:
                     raise Exception(f'Unsupported pointer type: {type(arg).__name__}')
             else:
                 return arg
 
 
-        def asstr(x):
-            if isinstance(x, ctypes.Structure):
-                return f'{x.__class__.__name__}(%s)' % (', '.join([
-                  f'{entry[0]}={asstr(getattr(x, entry[0]))}'
-                  for entry in x._fields_
-                  if getattr(x, entry[0])
-                ]))
-            else:
-                return str(x)
-
         async def wrapped(self, req, *args):
             async with self._req_seq_lock:
                 req_seq = self._next_req_seq
                 self._next_req_seq += 1
 
-            print(f'{req_seq} > {method.__name__[5:]}:', ', '.join([asstr(arg) for arg in args]))
+            print(f'{req_seq} > {method.__name__[5:]}:', ', '.join([pretty(arg) for arg in args]))
 
             try:
                 result = await method(self, req, *args)
@@ -167,7 +168,7 @@ class FuseTree(fusell.FUSELL):
                 await self._reply_err(req, errno.EFAULT)
                 result = repr(e)
 
-            print(f'{req_seq} < {method.__name__[5:]}: {result}')
+            print(f'{req_seq} < {method.__name__[5:]}: {pretty(result)}')
 
         def wrapper(self, *args):
             # Pointer arguments are destroyed when the callback exits,
@@ -175,6 +176,10 @@ class FuseTree(fusell.FUSELL):
             if method.__name__ == 'fuse_write':
                 args = list(args)
                 args[2] = ctypes.string_at(args[2], args[3])
+
+            if method.__name__ == 'fuse_forget_multi':
+                args = list(args)
+                args[2] = [copy_struct(args[2][i]) for i in range(args[1])]
 
             args = map(safe_arg, args)
 
@@ -240,20 +245,43 @@ class FuseTree(fusell.FUSELL):
 
         return await self._reply_entry(req, child)
 
+    async def _forget(self, ino, nlookup):
+        node = await self._ino_to_node(ino)
+        remaining_refs = await self._update_inodef_refs(node, -nlookup)
+        return f'{ino} forgotten' if remaining_refs == 0 else f'{ino} has {remaining_refs} references remaining'
+
     @_wrapper
     async def fuse_forget(self, req, ino, nlookup):
-        node = await self._ino_to_node(ino)
+        return await self._reply_none(req, await self._forget(ino, nlookup))
 
-        remaining_refs = await self._update_inodef_refs(node, -1)
+    @_wrapper
+    async def fuse_forget_multi(self, req, count, forgets):
+        #TODO: Could probably be more efficient, but good enough for now
+        tasks = [
+            self._forget(forgets[i].ino, forgets[i].nlookup)
+            for i in range(count)
+        ]
 
-        return await self._reply_none(req, 'Forgot' if remaining_refs == 0 else f'{remaining_refs} references remaining')
+        results, _ = await asyncio.wait(tasks)
+        return await self._reply_none(req, ', '.join(result.result() for result in results))
 
     @_wrapper
     async def fuse_getattr(self, req, ino, fi):
         node = await self._ino_to_node(ino)
-        stat = as_stat(await node.getattr())
 
-        return await self._reply_attr(req, stat, ino, node.attr_timeout)
+        ## Try to send setattr to the FileHandle
+        if fi is not None:
+            try:
+                async with self._handle_lock:
+                    handle = self._file_fds[fi.fh]
+                new_attr = as_stat(await handle.setattr(attr, to_set))
+            except OSError as e:
+                # Ignore not-implemented -- We will fallback to the same operation on the node
+                if e.errno != errno.ENOSYS:
+                    raise
+
+        attr = as_stat(await node.getattr())
+        return await self._reply_attr(req, attr, ino, node.attr_timeout)
 
     @_wrapper
     async def fuse_setattr(self, req, ino, attr, to_set, fi):
@@ -435,7 +463,7 @@ class FuseTree(fusell.FUSELL):
         node = await self._ino_to_node(ino)
         node_stat = as_stat(await node.getattr())
         node_stat = node_stat.with_values(st_ino=ino)
-        entries = [(b'.', node_stat.as_dict()), (b'..', node_stat.as_dict())]
+        entries = [('.', node_stat.as_dict()), ('..', node_stat.as_dict())]
         entry_names = []
 
         #TODO: Increase concurrency
@@ -450,7 +478,7 @@ class FuseTree(fusell.FUSELL):
             child_stat = as_stat(await child.getattr())
             child_stat = child_stat.with_values(st_ino=child_ino)
 
-            entries.append((child_name.encode(self.encoding), child_stat.as_dict()))
+            entries.append((child_name, child_stat.as_dict()))
             entry_names.append(child_name)
 
         self.reply_readdir(req, size, off, entries)

@@ -274,7 +274,8 @@ class FuseTree(fusell.FUSELL):
             try:
                 async with self._handle_lock:
                     handle = self._file_fds[fi.fh]
-                new_attr = as_stat(await handle.setattr(attr, to_set))
+                attr = as_stat(await handle.getattr())
+                return await self._reply_attr(req, attr, ino, node.attr_timeout)
             except OSError as e:
                 # Ignore not-implemented -- We will fallback to the same operation on the node
                 if e.errno != errno.ENOSYS:

@@ -8,23 +8,6 @@ from stat import S_IFDIR, S_IFLNK, S_IFREG
 import time
 import fuse
 
-
-#def IterableGenerator(func: callable) -> callable:
-    #def tmp(*args, **kwargs):
-        #class Iterable:
-            #def __init__(self, func, *args, **kwargs):
-                #self.func = func
-                #self.args = args
-                #self.kwargs = kwargs
-
-            #def __iter__(self):
-                #return self.func(*self.args, **self.kwargs)
-
-        #return Iterable(func, *args, **kwargs)
-    #return tmp
-
-
-
 @fusetree.generatorfile
 def count(n=None):
     i = 1

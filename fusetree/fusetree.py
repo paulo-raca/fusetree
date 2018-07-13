@@ -52,8 +52,24 @@ class FuseTree(fusell.FUSELL):
         self._file_fds: Dict[int, FileHandle] = {}
         self._dir_fds: Dict[int, DirHandle] = {}
 
+        #This maps automatically mapping of "Node-like" things to nodes
+        self._node_like_to_node: Dict[int, Any] = {}
+        self._node_to_node_like: Dict[int, Any] = {}
+
         super().__init__(mountpoint, encoding=encoding)
 
+    async def _as_node(self, node: Node_Like) -> Node:
+        async with self._handle_lock:
+            existing = self._node_like_to_node.get(id(node), None)
+            if existing is not None:
+                return existing
+
+        actual_node = as_node(node)
+        if actual_node is not node:
+            async with self._handle_lock:
+                self._node_like_to_node[id(node)] = actual_node
+                self._node_to_node_like[id(actual_node)] = node
+        return actual_node
 
     async def _ino_to_node(self, inode: int) -> Node:
         async with self._handle_lock:
@@ -87,6 +103,11 @@ class FuseTree(fusell.FUSELL):
                         del self._inodes_refs[ino]
                         del self._inodes[ino]
 
+                        node_like = self._node_to_node_like[id(node)]
+                        if node_like is not None:
+                            del self._node_to_node_like[id(node)]
+                            del self._node_like_to_node[id(node_like)]
+
             else:
                 pass  # update == 0 -- Shouldn't happen, but is a no-op No-op
 
@@ -97,7 +118,10 @@ class FuseTree(fusell.FUSELL):
 
     async def _reply_err(self, req, err: int) -> (int, str):
         self.reply_err(req, err)
-        return (err, os.strerror(err))
+        if err == 0:
+            return 'Success'
+        else:
+            return 'ERR %d: %s' % (err, os.strerror(err))
 
     async def _reply_entry(self, req, node: Node) -> (int, Node):
         ino = await self._node_to_ino(node)
@@ -211,17 +235,19 @@ class FuseTree(fusell.FUSELL):
         # Forget all nodes
         async def forget_all():
             async with self._handle_lock:
-                wait_for = []
-                for node in self._inodes.values():
-                    if node is not self.rootNode:
-                        wait_for.append(node.forget())
-                if len(wait_for):
-                    await asyncio.wait(wait_for)
+                # Forgets every node except the root
+                await asyncio.wait([
+                    node.forget()
+                    for node in self._inodes.values()
+                    if node is not self.rootNode
+                ])
 
                 # The root node is the last one to be forgotten, and acts as a destroy()
                 await self.rootNode.forget()
                 self._inodes.clear()
                 self._inodes_refs.clear()
+                self._node_like_to_node.clear()
+                self._node_to_node_like.clear()
 
         asyncio.run_coroutine_threadsafe(forget_all(), self._loop).result()
 
@@ -239,7 +265,7 @@ class FuseTree(fusell.FUSELL):
     async def fuse_lookup(self, req, parent_ino, name):
         parent = await self._ino_to_node(parent_ino)
         _child = await parent.lookup(name.decode(self.encoding))
-        child = as_node(_child)
+        child = await self._as_node(_child)
         if child is not _child:
             print(f'Converted child {name} for {type(_child)} to {type(child)}')
 
@@ -322,14 +348,14 @@ class FuseTree(fusell.FUSELL):
     @_wrapper
     async def fuse_mknod(self, req, parent_ino, name, mode, rdev):
         parent = await self._ino_to_node(parent_ino)
-        new_node = as_node(await parent.mknod(name.decode(self.encoding), mode, rdev))
+        new_node = await self._as_node(await parent.mknod(name.decode(self.encoding), mode, rdev))
 
         return await self._reply_entry(req, new_node)
 
     @_wrapper
     async def fuse_mkdir(self, req, parent_ino, name, mode):
         parent = await self._ino_to_node(parent_ino)
-        new_dir = as_node(await parent.mkdir(name.decode(self.encoding), mode))
+        new_dir = await self._as_node(await parent.mkdir(name.decode(self.encoding), mode))
 
         return await self._reply_entry(req, new_dir)
 
@@ -366,7 +392,7 @@ class FuseTree(fusell.FUSELL):
     async def fuse_link(self, req, ino, new_parent_ino, new_name):
         node = await self._ino_to_node(ino)
         new_parent = await self._ino_to_node(new_parent_ino)
-        new_link = as_node(await new_parent.link(ino, new_name))
+        new_link = await self._as_node(await new_parent.link(ino, new_name))
 
         return await self._reply_entry(req, new_link)
 
@@ -471,7 +497,7 @@ class FuseTree(fusell.FUSELL):
         async for entry in dirhandle.readdir():
             if isinstance(entry, str):
                 child_name = entry
-                child = as_node(await node.lookup(child_name))
+                child = await self._as_node(await node.lookup(child_name))
             else:
                 child_name, child = entry
 

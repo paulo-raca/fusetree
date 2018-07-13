@@ -31,10 +31,6 @@ class Node:
     Common implementations to several common node types are provided on `nodetypes`.
     """
 
-    def __init__(self, attr_timeout=1, entry_timeout=1):
-        self.attr_timeout = attr_timeout
-        self.entry_timeout = entry_timeout
-
     @property
     def attr_timeout(self):
         return 1

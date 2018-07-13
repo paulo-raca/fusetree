@@ -34,7 +34,7 @@ rootNode = {
     'editable_dir': fusetree.DictDir({'README': fusetree.BlobFile(b'You can edit the contents of this directory.\n\nTry to create files, folders, symlinks, hardlinks, rename and delete them.\n', rw=True)}, rw=True),
 
     # https://commons.wikimedia.org/wiki/File:JPEG_example_JPG_RIP_001.jpg
-    'binary.jpg': b'\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x01\x00H\x00H\x00\x00\xff\xdb\x00C'
+    'blob.jpg':   b'\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x01\x00H\x00H\x00\x00\xff\xdb\x00C'
                 + b'\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff'
                 + b'\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff'
                 + b'\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff'
@@ -107,7 +107,8 @@ rootNode = {
     'count-100': count(100),
     'count-forever': count(),
     '99-bottles': bottles(99),
-    'xkcd': fusetree.HttpFile('https://xkcd.com'),
+    'example.html': fusetree.HttpFile('https://example.com/'),
+    'xkcd.png': fusetree.HttpFile('https://xkcd.com/s/0b7742.png'),
     'linux.tar.xz': fusetree.HttpFile('https://cdn.kernel.org/pub/linux/kernel/v4.x/linux-4.15.4.tar.xz'),
     'link-to-99-bottles': fusetree.Symlink('99-bottles'),
 }

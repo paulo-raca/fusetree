@@ -497,9 +497,11 @@ class FuseTree(fusell.FUSELL):
         async for entry in dirhandle.readdir():
             if isinstance(entry, str):
                 child_name = entry
-                child = await self._as_node(await node.lookup(child_name))
+                child = await node.lookup(child_name)
             else:
                 child_name, child = entry
+
+            child = await self._as_node(child)
 
             child_ino = await self._node_to_ino(child)
             child_stat = as_stat(await child.getattr())

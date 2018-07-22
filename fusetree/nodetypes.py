@@ -140,7 +140,8 @@ class GeneratorFile(BaseFile):
     class Handle(FileHandle):
         def __init__(self, node: Node, generator: Iterable[Bytes_Like], min_read_len: int = -1) -> None:
             super().__init__(node, direct_io=True, nonseekable=True)
-            self.generator = iter(generator)
+
+            self.generator = self.as_generator(generator)
             self.current_blob = b''
             self.current_blob_position = 0
             self.min_read_len = min_read_len
@@ -155,8 +156,8 @@ class GeneratorFile(BaseFile):
                     self.current_blob_position += n
                 else:
                     try:
-                        self.current_blob = types_conv.as_bytes(next(self.generator))
-                    except StopIteration:
+                        self.current_blob = types_conv.as_bytes(await self.generator.__anext__())
+                    except StopAsyncIteration:
                         self.current_blob = None
                     self.current_blob_position = 0
 
@@ -164,20 +165,27 @@ class GeneratorFile(BaseFile):
                     break
             return ret
 
+        def as_generator(self, generator):
+            async def as_async_gen(data):
+                for x in data:
+                    yield x
 
-def generatorfile(func):
+            if hasattr(generator, '__anext__'):
+                return generator
+            elif hasattr(generator, '__aiter__'):
+                return generator.__aiter__()
+            elif hasattr(generator, '__next__'):
+                return as_async_gen(generator)
+            elif hasattr(generator, '__iter__'):
+                return as_async_gen(iter(generator))
+            elif callable(generator):
+                return self.as_generator(generator())
+
+            raise TypeError('Expected iterator, iterable, async iterator, async iterable or callable')
+
+def generatorfile(func, async=None):
     def tmp(*args, **kwargs):
-        class Iterable:
-            def __init__(self, func, *args, **kwargs):
-                self.func = func
-                self.args = args
-                self.kwargs = kwargs
-
-            def __iter__(self):
-                return self.func(*self.args, **self.kwargs)
-
-        iterable = Iterable(func, *args, **kwargs)
-        return GeneratorFile(iterable)
+        return GeneratorFile(lambda: func(*args, **kwargs))
     return tmp
 
 

@@ -16,7 +16,7 @@ def count(n=None):
         i += 1
 
 @fusetree.generatorfile
-def bottles(n):
+async def bottles(n):
    for i in range(n, 0, -1):
       yield \
 f"""\

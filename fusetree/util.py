@@ -27,3 +27,7 @@ def is_iterable(x):
         return True
     except:
         return False
+
+
+def is_async_iterable(x):
+      return hasattr(x, '__anext__') or hasattr(generator, '__aiter__')

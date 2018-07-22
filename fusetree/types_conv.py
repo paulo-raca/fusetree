@@ -25,7 +25,7 @@ def as_node(node: Node_Like) -> 'core.Node':
         return nodetypes.BlobFile(as_bytes(node))
     elif isinstance(node, dict):
         return nodetypes.DictDir(node)
-    elif util.is_iterable(node):
+    elif util.is_iterable(node) or util.is_async_iterable(node):
         return nodetypes.GeneratorFile(node)
     raise fuse.FuseOSError(errno.EIO)
 

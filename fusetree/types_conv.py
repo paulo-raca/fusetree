@@ -27,6 +27,7 @@ def as_node(node: Node_Like) -> 'core.Node':
         return nodetypes.DictDir(node)
     elif util.is_iterable(node) or util.is_async_iterable(node):
         return nodetypes.GeneratorFile(node)
+
     raise fuse.FuseOSError(errno.EIO)
 
 def as_filehandle(node: 'core.Node', filehandle: FileHandle_Like) -> 'core.FileHandle':
@@ -34,8 +35,9 @@ def as_filehandle(node: 'core.Node', filehandle: FileHandle_Like) -> 'core.FileH
         return filehandle
     elif isinstance(filehandle, bytes) or isinstance(filehandle, str):
         return nodetypes.BlobFile.Handle(node, as_bytes(filehandle))
-    elif util.is_iterable(filehandle):
+    elif util.is_iterable(filehandle) or util.is_async_iterable(filehandle):
         return nodetypes.GeneratorFile.Handle(node, filehandle)
+
     raise fuse.FuseOSError(errno.EIO)
 
 def as_dirhandle(node: 'core.Node', dirhandle: DirHandle_Like) -> 'core.DirHandle':

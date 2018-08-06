@@ -20,7 +20,7 @@ class BaseFile(Node):
 
 
 class BaseDir(Node):
-    def __init__(self, mode: int = 0o444) -> None:
+    def __init__(self, mode: int = 0o555) -> None:
         self.mode = mode & 0o777
 
     async def getattr(self) -> Stat:
@@ -215,7 +215,7 @@ class HttpFile(BaseFile):
 
 class DictDir(BaseDir):
     def __init__(self, contents: Dict[str, Node_Like], mode: int = None, rw: bool = False) -> None:
-        super().__init__(mode if mode is not None else 0o666 if rw else 0o444)
+        super().__init__(mode if mode is not None else 0o777 if rw else 0o555)
         self.rw = rw
         self.contents = contents
 

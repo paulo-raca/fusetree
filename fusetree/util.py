@@ -30,4 +30,4 @@ def is_iterable(x):
 
 
 def is_async_iterable(x):
-      return hasattr(x, '__anext__') or hasattr(generator, '__aiter__')
+      return hasattr(x, '__anext__') or hasattr(x, '__aiter__')

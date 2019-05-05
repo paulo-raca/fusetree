@@ -8,9 +8,10 @@ I don't like Fuse's "high-level" API:
 3. Threads are cool, but AsyncIO is would be way better ;)
 
 Fuse's The "low-level" API is much more fun, but:
-- It is, after all, too low-level for pratical purposes.
+- The callbacks-based API is nice, but require extra work on non-trivial (slow) calls.
 - It also requires custom "routing" logic to make the same callbacks reach the correct file handlers.
 - You have to manually keep track of inodes and etc
+- It is, after all, too low-level for pratical purposes.
 
 ## Fusetree
 

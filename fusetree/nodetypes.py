@@ -183,7 +183,7 @@ class GeneratorFile(BaseFile):
 
             raise TypeError('Expected iterator, iterable, async iterator, async iterable or callable')
 
-def generatorfile(func, async=None):
+def generatorfile(func):
     def tmp(*args, **kwargs):
         return GeneratorFile(lambda: func(*args, **kwargs))
     return tmp

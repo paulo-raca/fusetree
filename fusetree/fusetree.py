@@ -208,7 +208,7 @@ class FuseTree(fusell.FUSELL):
             args = map(safe_arg, args)
 
             future = wrapped(self, *args)
-            self._loop.call_soon_threadsafe(asyncio.async, future)
+            self._loop.call_soon_threadsafe(self._loop.create_task, future)
 
         return wrapper
 
